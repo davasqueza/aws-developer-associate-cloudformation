@@ -1,0 +1,127 @@
+service: ec2-fundamentals
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+
+resources:
+  Resources:
+    MyFirstVPC:
+      Type: AWS::EC2::VPC
+      Properties:
+        CidrBlock: 172.31.0.0/16
+        EnableDnsSupport: true
+        EnableDnsHostnames: true
+        InstanceTenancy: default
+
+    VPCInternetGateway:
+      Type: AWS::EC2::InternetGateway
+      Properties:
+        Tags:
+          - Key: Name
+            Value: Elastic Load Balancer VPC IG
+
+    AttachGateway:
+      Type: AWS::EC2::VPCGatewayAttachment
+      Properties:
+        VpcId: !Ref MyFirstVPC
+        InternetGatewayId: !Ref VPCInternetGateway
+
+    RouteTable:
+      Type: AWS::EC2::RouteTable
+      Properties:
+        VpcId: !Ref MyFirstVPC
+
+    DefaultIpv4Route:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref RouteTable
+        DestinationCidrBlock: 0.0.0.0/0
+        GatewayId: !Ref VPCInternetGateway
+
+    PublicSubnet:
+      Type: AWS::EC2::Subnet
+      Properties:
+        VpcId: !Ref MyFirstVPC
+        CidrBlock: 172.31.0.0/20
+        MapPublicIpOnLaunch: true
+
+    RouteTableAssociation:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        RouteTableId: !Ref RouteTable
+        SubnetId: !Ref PublicSubnet
+
+    InstanceSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: Instance SG for HTTP and SSH access
+        VpcId: !Ref MyFirstVPC
+        SecurityGroupIngress:
+          - CidrIp: 0.0.0.0/0
+            FromPort: 22
+            ToPort: 22
+            IpProtocol: tcp
+          - CidrIp: 0.0.0.0/0
+            FromPort: 80
+            ToPort: 80
+            IpProtocol: tcp
+        SecurityGroupEgress:
+          - CidrIp: 0.0.0.0/0
+            IpProtocol: "-1"
+
+    InstanceProfile:
+      Type: AWS::IAM::InstanceProfile
+      Properties:
+        InstanceProfileName: ec2-instance-profile
+        Roles:
+          - !Ref BasicAdminRole
+
+    BasicAdminRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: basic-admin-role
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - ec2.amazonaws.com
+              Action:
+                - sts:AssumeRole
+
+    ReadonlyAdminPolicy:
+      Type: AWS::IAM::Policy
+      Properties:
+        PolicyName: ReadonlyAdminPolicy
+        Roles:
+          - !Ref BasicAdminRole
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - iam:GenerateCredentialReport
+                - iam:GenerateServiceLastAccessedDetails
+                - iam:Get*
+                - iam:List*
+                - iam:SimulateCustomPolicy
+                - iam:SimulatePrincipalPolicy
+              Resource:
+                - "*"
+
+    MyFirstCFInstance:
+      Type: AWS::EC2::Instance
+      Properties:
+        ImageId: ami-00c6177f250e07ec1
+        KeyName: "EC2 Tutorial"
+        InstanceType: t2.micro
+        UserData: !Base64 ${file(ec2-user-data.sh)}
+        IamInstanceProfile: !Ref InstanceProfile
+        SubnetId: !Ref PublicSubnet
+        SecurityGroupIds:
+          - !Ref InstanceSecurityGroup
+        Tags:
+          - Key: Name
+            Value: My First Instance

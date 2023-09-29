@@ -1,0 +1,233 @@
+service: ec2-instance-storage
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+
+resources:
+  Resources:
+
+    # ---------------------------------------
+    # -----------VPC Configuration-----------
+    # ---------------------------------------
+
+    InstanceStorageVPC:
+      Type: AWS::EC2::VPC
+      Properties:
+        CidrBlock: 10.0.0.0/16
+        EnableDnsSupport: true
+        EnableDnsHostnames: true
+        InstanceTenancy: default
+        Tags:
+          - Key: Name
+            Value: Instance storage VPC
+
+    VPCInternetGateway:
+      Type: AWS::EC2::InternetGateway
+      Properties:
+        Tags:
+          - Key: Name
+            Value: Instance storage VPC IG
+
+    AttachGateway:
+      Type: AWS::EC2::VPCGatewayAttachment
+      Properties:
+        VpcId: !Ref InstanceStorageVPC
+        InternetGatewayId: !Ref VPCInternetGateway
+
+    RouteTable:
+      Type: AWS::EC2::RouteTable
+      Properties:
+        VpcId: !Ref InstanceStorageVPC
+        Tags:
+          - Key: Name
+            Value: Instance storage VPC Route Table
+
+    DefaultIpv4Route:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref RouteTable
+        DestinationCidrBlock: 0.0.0.0/0
+        GatewayId: !Ref VPCInternetGateway
+
+
+    InstanceASubnet:
+      Type: AWS::EC2::Subnet
+      Properties:
+        CidrBlock: 10.0.1.0/24
+        VpcId: !Ref InstanceStorageVPC
+        AvailabilityZone: "us-east-1a"
+        MapPublicIpOnLaunch: true
+        Tags:
+          - Key: Name
+            Value: Instance A Subnet
+
+    InstanceBSubnet:
+      Type: AWS::EC2::Subnet
+      Properties:
+        CidrBlock: 10.0.2.0/24
+        VpcId: !Ref InstanceStorageVPC
+        AvailabilityZone: "us-east-1b"
+        MapPublicIpOnLaunch: true
+        Tags:
+          - Key: Name
+            Value: Instance B Subnet
+
+    InstanceASubnetRTA:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        RouteTableId: !Ref RouteTable
+        SubnetId: !Ref InstanceASubnet
+
+    InstanceBSubnetRTA:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        RouteTableId: !Ref RouteTable
+        SubnetId: !Ref InstanceBSubnet
+
+    # ---------------------------------------
+    # -----------EFS Configuration-----------
+    # ---------------------------------------
+
+    FileSystemResource:
+      Type: AWS::EFS::FileSystem
+      Properties:
+        BackupPolicy:
+          Status: DISABLED
+        Encrypted: false
+        PerformanceMode: generalPurpose
+        ThroughputMode: bursting
+
+    EFSMountTargetInboundSG:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: Inbound rules for mount target
+        VpcId: !Ref InstanceStorageVPC
+
+    EFSMountTargetInboundSGIngress:
+      Type: AWS::EC2::SecurityGroupIngress
+      Properties:
+        GroupId: !Ref EFSMountTargetInboundSG
+        SourceSecurityGroupId: !GetAtt EFSMountTargetOutboundSG.GroupId
+        FromPort: 2049
+        ToPort: 2049
+        IpProtocol: tcp
+
+    EFSMountTargetOutboundSG:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: Outbound rules for mount target
+        VpcId: !Ref InstanceStorageVPC
+
+    EFSMountTargetOutboundSGEgress:
+      Type: AWS::EC2::SecurityGroupEgress
+      Properties:
+        GroupId: !Ref EFSMountTargetOutboundSG
+        DestinationSecurityGroupId: !GetAtt EFSMountTargetInboundSG.GroupId
+        FromPort: 2049
+        ToPort: 2049
+        IpProtocol: tcp
+
+    MountTargetA:
+      Type: AWS::EFS::MountTarget
+      Properties:
+        FileSystemId: !Ref FileSystemResource
+        SubnetId: !Ref InstanceASubnet
+        SecurityGroups:
+          - !Ref EFSMountTargetInboundSG
+
+    InstanceBMountTarget:
+      Type: AWS::EFS::MountTarget
+      Properties:
+        FileSystemId: !Ref FileSystemResource
+        SubnetId: !Ref InstanceBSubnet
+        SecurityGroups:
+          - !Ref EFSMountTargetInboundSG
+
+        # ---------------------------------------
+        # -----------EC2 Configuration-----------
+        # ---------------------------------------
+
+
+    InstanceSSHAccessSG:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: Instance SG for SSH access
+        VpcId: !Ref InstanceStorageVPC
+        SecurityGroupIngress:
+          - CidrIp: 0.0.0.0/0
+            FromPort: 22
+            ToPort: 22
+            IpProtocol: tcp
+
+    InstanceProfile:
+      Type: AWS::IAM::InstanceProfile
+      Properties:
+        InstanceProfileName: ec2-instance-profile
+        Roles:
+          - !Ref EC2InstanceRole
+
+    EC2InstanceRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: basic-instance-read-role
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - ec2.amazonaws.com
+              Action:
+                - sts:AssumeRole
+
+    ReadonlyEC2DescribePolicy:
+      Type: AWS::IAM::Policy
+      Properties:
+        PolicyName: ReadonlyTagsPolicy
+        Roles:
+          - !Ref EC2InstanceRole
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - ec2:Describe*
+              Resource:
+                - "*"
+
+    InstanceA:
+      Type: AWS::EC2::Instance
+      Properties:
+        ImageId: ami-00c6177f250e07ec1
+        KeyName: "EC2 Tutorial"
+        InstanceType: t2.micro
+        UserData: !Base64 ${file(ec2-user-data.sh)}
+        IamInstanceProfile: !Ref InstanceProfile
+        SubnetId: !Ref InstanceASubnet
+        SecurityGroupIds:
+          - !Ref InstanceSSHAccessSG
+          - !Ref EFSMountTargetOutboundSG
+        Tags:
+          - Key: Name
+            Value: Instance A
+          - Key: EFSID
+            Value: !Ref FileSystemResource
+
+    InstanceB:
+      Type: AWS::EC2::Instance
+      Properties:
+        ImageId: ami-00c6177f250e07ec1
+        KeyName: "EC2 Tutorial"
+        InstanceType: t2.micro
+        UserData: !Base64 ${file(ec2-user-data.sh)}
+        IamInstanceProfile: !Ref InstanceProfile
+        SubnetId: !Ref InstanceBSubnet
+        SecurityGroupIds:
+          - !Ref InstanceSSHAccessSG
+          - !Ref EFSMountTargetOutboundSG
+        Tags:
+          - Key: Name
+            Value: Instance B
+          - Key: EFSID
+            Value: !Ref FileSystemResource
