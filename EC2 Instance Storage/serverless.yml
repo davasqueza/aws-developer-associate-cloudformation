@@ -198,6 +198,7 @@ resources:
 
     InstanceA:
       Type: AWS::EC2::Instance
+      DependsOn: FileSystemResource
       Properties:
         ImageId: ami-00c6177f250e07ec1
         KeyName: "EC2 Tutorial"
@@ -216,6 +217,7 @@ resources:
 
     InstanceB:
       Type: AWS::EC2::Instance
+      DependsOn: FileSystemResource
       Properties:
         ImageId: ami-00c6177f250e07ec1
         KeyName: "EC2 Tutorial"
