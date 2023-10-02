@@ -174,6 +174,7 @@ resources:
 
     BasicASG:
       Type: AWS::AutoScaling::AutoScalingGroup
+      DependsOn: VPCInternetGateway
       Properties:
         LaunchTemplate:
           LaunchTemplateId: !Ref BasicWebServerTemplate
