@@ -178,8 +178,8 @@ resources:
         LaunchTemplate:
           LaunchTemplateId: !Ref BasicWebServerTemplate
           Version: !GetAtt BasicWebServerTemplate.LatestVersionNumber
-        MaxSize: '1'
-        MinSize: '0'
+        MaxSize: '3'
+        MinSize: '1'
         DesiredCapacity: '1'
         HealthCheckType: 'ELB'
         HealthCheckGracePeriod: 30
@@ -188,3 +188,14 @@ resources:
         VPCZoneIdentifier:
           - !Ref PublicSubnet1
           - !Ref PublicSubnet2
+
+    AverageCPUScalePolicy:
+      Type: AWS::AutoScaling::ScalingPolicy
+      Properties:
+        AutoScalingGroupName: !Ref BasicASG
+        PolicyType: 'TargetTrackingScaling'
+        TargetTrackingConfiguration:
+          PredefinedMetricSpecification:
+            PredefinedMetricType: 'ASGAverageCPUUtilization'
+          TargetValue: 40
+        EstimatedInstanceWarmup: 300
