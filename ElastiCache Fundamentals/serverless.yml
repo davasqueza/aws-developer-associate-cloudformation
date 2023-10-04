@@ -1,0 +1,130 @@
+service: elasticache-fundamentals
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+
+resources:
+  Resources:
+    # ---------------------------------------
+    # -----------VPC Configuration-----------
+    # ---------------------------------------
+
+    ElastiCacheVPC:
+      Type: AWS::EC2::VPC
+      Properties:
+        CidrBlock: 10.0.0.0/16
+        EnableDnsSupport: true
+        EnableDnsHostnames: true
+        Tags:
+          - Key: Name
+            Value: Database VPC
+
+    VPCInternetGateway:
+      Type: AWS::EC2::InternetGateway
+      Properties:
+        Tags:
+          - Key: Name
+            Value: Database VPC IG
+
+    AttachGateway:
+      Type: AWS::EC2::VPCGatewayAttachment
+      Properties:
+        VpcId: !Ref ElastiCacheVPC
+        InternetGatewayId: !Ref VPCInternetGateway
+
+    RouteTable:
+      Type: AWS::EC2::RouteTable
+      Properties:
+        VpcId: !Ref ElastiCacheVPC
+        Tags:
+          - Key: Name
+            Value: Database Route Table
+
+    DefaultIpv4Route:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref RouteTable
+        DestinationCidrBlock: 0.0.0.0/0
+        GatewayId: !Ref VPCInternetGateway
+
+    PublicSubnet1:
+      Type: AWS::EC2::Subnet
+      Properties:
+        VpcId: !Ref ElastiCacheVPC
+        CidrBlock: 10.0.1.0/24
+        MapPublicIpOnLaunch: true
+        AvailabilityZone: !Select
+          - 0
+          - Fn::GetAZs: !Ref 'AWS::Region'
+        Tags:
+          - Key: Name
+            Value: Public Subnet 1
+
+    PublicSubnet2:
+      Type: AWS::EC2::Subnet
+      Properties:
+        VpcId: !Ref ElastiCacheVPC
+        CidrBlock: 10.0.2.0/24
+        MapPublicIpOnLaunch: true
+        AvailabilityZone: !Select
+          - 1
+          - Fn::GetAZs: !Ref 'AWS::Region'
+        Tags:
+          - Key: Name
+            Value: Public Subnet 2
+
+    RouteTableAssociation1:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        RouteTableId: !Ref RouteTable
+        SubnetId: !Ref PublicSubnet1
+
+    RouteTableAssociation2:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        RouteTableId: !Ref RouteTable
+        SubnetId: !Ref PublicSubnet2
+
+    CacheSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: Cache SG for public access
+        VpcId: !Ref ElastiCacheVPC
+        SecurityGroupIngress:
+          - CidrIp: 0.0.0.0/0
+            FromPort: 6379
+            ToPort: 6379
+            IpProtocol: tcp
+
+    # -----------------------------------------------
+    # -----------ElastiCache Configuration-----------
+    # -----------------------------------------------
+
+    RedisElasticacheCluster:
+      Type: AWS::ElastiCache::CacheCluster
+      Properties:
+        ClusterName: 'redis-cache-cluster'
+        Engine: redis
+        EngineVersion: '6.2'
+        AZMode: 'single-az'
+        CacheNodeType: 'cache.t2.micro'
+        NumCacheNodes: 1
+        VpcSecurityGroupIds:
+          - !Ref CacheSecurityGroup
+        CacheSubnetGroupName: !Ref CacheSubnetGroup
+        TransitEncryptionEnabled: false
+        SnapshotRetentionLimit: 0
+        Port: 6379
+
+    CacheSubnetGroup:
+      Type: AWS::ElastiCache::SubnetGroup
+      Properties:
+        CacheSubnetGroupName: 'db-subnet-group-redis'
+        Description: 'Subnet for ElastiCache Fundamentals database'
+        SubnetIds:
+          - !Ref PublicSubnet1
+          - !Ref PublicSubnet2
+        Tags:
+          - Key: Name
+            Value: Cache Subnet Group
