@@ -1,4 +1,4 @@
-service: rds-fundamentals
+service: rds-aurora
 
 provider:
   name: aws
@@ -101,34 +101,48 @@ resources:
     # -----------RDS Configuration-----------
     # ---------------------------------------
 
-    RDSInstance:
-      Type: AWS::RDS::DBInstance
+    AuroraCluster:
+      Type: AWS::RDS::DBCluster
       DependsOn: VPCInternetGateway
       Properties:
-        DBInstanceIdentifier: 'database-1'
-        Engine: mysql
-        EngineVersion: '8.0.34'
+        DBClusterIdentifier: 'database-2'
+        Engine: aurora-mysql
+        EngineVersion: '8.0.mysql_aurora.3.04.0'
         MasterUsername: admin
-        MasterUserPassword: 12345678
-        DBInstanceClass: 'db.t2.micro'
-        StorageType: gp2
-        AllocatedStorage: 20
-        MaxAllocatedStorage: 1000
-        VPCSecurityGroups:
+        MasterUserPassword: '12345678'
+        VpcSecurityGroupIds:
           - !Ref DatabaseSecurityGroup
-        DBName: mydb
-        BackupRetentionPeriod: 7
-        AutoMinorVersionUpgrade: true
+        DatabaseName: mydb
         DBSubnetGroupName: !Ref DatabaseSubnetGroup
-        Port: 3306
+        BacktrackWindow: 0
+
+    RDSDBInstance1:
+      Type: AWS::RDS::DBInstance
+      Properties:
+        DBInstanceIdentifier: 'database-2-instance-1'
+        DBClusterIdentifier:
+          Ref: AuroraCluster
+        Engine: aurora-mysql
+        EngineVersion: '8.0.mysql_aurora.3.04.0'
+        DBInstanceClass: 'db.t3.medium'
         PubliclyAccessible: true
 
+    RDSDBInstance2:
+      Type: AWS::RDS::DBInstance
+      Properties:
+        DBInstanceIdentifier: 'database-2-instance-2'
+        DBClusterIdentifier:
+          Ref: AuroraCluster
+        Engine: aurora-mysql
+        EngineVersion: '8.0.mysql_aurora.3.04.0'
+        DBInstanceClass: 'db.t3.medium'
+        PubliclyAccessible: true
 
     DatabaseSubnetGroup:
       Type: AWS::RDS::DBSubnetGroup
       Properties:
-        DBSubnetGroupDescription: 'Subnet for MySQL database'
-        DBSubnetGroupName: 'db-subnet-group'
+        DBSubnetGroupDescription: 'Subnet for Aurora-MySQL database'
+        DBSubnetGroupName: 'db-subnet-group-aurora'
         SubnetIds:
           - !Ref PublicSubnet1
           - !Ref PublicSubnet2
