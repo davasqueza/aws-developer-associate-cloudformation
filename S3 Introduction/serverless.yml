@@ -1,0 +1,22 @@
+service: s3-introduction
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+
+resources:
+  Resources:
+  # --------------------------------------
+  # -----------S3 Configuration-----------
+  # --------------------------------------
+    S3BucketRegionA:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: 's3-introduction-bucket-a'
+        AccessControl: PublicRead
+        VersioningConfiguration:
+          Status: Enabled
+        WebsiteConfiguration:
+          IndexDocument: 'index.html'
+      DeletionPolicy: Delete
+      UpdateReplacePolicy: Retain
