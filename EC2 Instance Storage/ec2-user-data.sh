@@ -23,8 +23,9 @@ yum update -y
 yum install -y amazon-efs-utils # Installs Amazon EFS utilities for mounting EFS file systems
 yum install -y jq # Installs JQ for parsing JSON
 
-INSTANCE_ID=$(curl http://169.254.169.254/latest/meta-data/instance-id)
-REGION_ID=$(curl http://169.254.169.254/latest/meta-data/placement/region)
+TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+INSTANCE_ID=$(curl http://169.254.169.254/latest/meta-data/instance-id -H "X-aws-ec2-metadata-token: $TOKEN")
+REGION_ID=$(curl http://169.254.169.254/latest/meta-data/placement/region -H "X-aws-ec2-metadata-token: $TOKEN")
 EFS_TAG=$(aws ec2 describe-tags --filters "Name=resource-id,Values=$INSTANCE_ID" "Name=key,Values=EFSID" --region $REGION_ID)
 EFS_ID=$(echo $EFS_TAG | jq -r ".[][].Value")
 
