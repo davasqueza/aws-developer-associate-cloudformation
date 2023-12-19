@@ -13,7 +13,11 @@ resources:
       Type: AWS::S3::Bucket
       Properties:
         BucketName: 's3-introduction-bucket-a'
-        AccessControl: PublicRead
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: false
+        OwnershipControls:
+          Rules:
+            - ObjectOwnership: ObjectWriter
         VersioningConfiguration:
           Status: Enabled
         WebsiteConfiguration:
