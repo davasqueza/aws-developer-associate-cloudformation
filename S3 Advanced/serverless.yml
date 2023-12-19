@@ -4,15 +4,25 @@ provider:
   name: aws
   runtime: nodejs16.x
 
+custom:
+  bucketName: 's3-advanced-bucket'
+
 resources:
   Resources:
   # --------------------------------------
   # -----------S3 Configuration-----------
   # --------------------------------------
-    S3BucketRegionA:
+    S3Bucket:
       Type: AWS::S3::Bucket
+      DependsOn:
+        - S3NotificationsQueue
+        - ReceiveS3MessagesPolicy
       Properties:
-        BucketName: 's3-advanced-bucket'
+        BucketName: '${self:custom.bucketName}'
+        NotificationConfiguration:
+          QueueConfigurations:
+            - Event: 's3:ObjectCreated:*'
+              Queue: !GetAtt S3NotificationsQueue.Arn
         LifecycleConfiguration:
           Rules:
             - Id: DemoRule
@@ -36,3 +46,31 @@ resources:
                 NoncurrentDays: 700
       DeletionPolicy: Delete
       UpdateReplacePolicy: Retain
+
+  # --------------------------------------
+  # -----------SQS Configuration----------
+  # --------------------------------------
+    S3NotificationsQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: 's3-notifications-queue'
+
+    ReceiveS3MessagesPolicy:
+      Type: AWS::SQS::QueuePolicy
+      Properties:
+        PolicyDocument:
+          Statement:
+            - Action:
+                - 'SQS:SendMessage'
+              Effect: Allow
+              Resource: !GetAtt S3NotificationsQueue.Arn
+              Principal:
+                Service:
+                  - 's3.amazonaws.com'
+              Condition:
+                ArnLike:
+                  'aws:SourceArn':
+                    - 'arn:aws:s3:::${self:custom.bucketName}'
+        Queues:
+          - !Ref S3NotificationsQueue
+
