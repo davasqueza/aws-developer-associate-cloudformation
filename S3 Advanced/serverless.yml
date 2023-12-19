@@ -1,0 +1,38 @@
+service: s3-advanced
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+
+resources:
+  Resources:
+  # --------------------------------------
+  # -----------S3 Configuration-----------
+  # --------------------------------------
+    S3BucketRegionA:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: 's3-advanced-bucket'
+        LifecycleConfiguration:
+          Rules:
+            - Id: DemoRule
+              Status: Enabled
+              ExpirationInDays: 700
+              Transitions:
+                - TransitionInDays: 30
+                  StorageClass: STANDARD_IA
+                - TransitionInDays: 60
+                  StorageClass: INTELLIGENT_TIERING
+                - TransitionInDays: 90
+                  StorageClass: GLACIER_IR
+                - TransitionInDays: 180
+                  StorageClass: GLACIER
+                - TransitionInDays: 365
+                  StorageClass: DEEP_ARCHIVE
+              NoncurrentVersionTransitions:
+                - TransitionInDays: 90
+                  StorageClass: GLACIER
+              NoncurrentVersionExpiration:
+                NoncurrentDays: 700
+      DeletionPolicy: Delete
+      UpdateReplacePolicy: Retain
