@@ -1,0 +1,63 @@
+service: s3-security
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+
+resources:
+  Resources:
+  # --------------------------------------
+  # -----------S3 Configuration-----------
+  # --------------------------------------
+    S3Bucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: 's3-security-bucket-a'
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: false
+        OwnershipControls:
+          Rules:
+            - ObjectOwnership: ObjectWriter
+        VersioningConfiguration:
+          Status: Enabled
+        BucketEncryption:
+          ServerSideEncryptionConfiguration:
+            - BucketKeyEnabled: true
+              ServerSideEncryptionByDefault:
+                SSEAlgorithm: 'aws:kms'
+                KMSMasterKeyID: !GetAtt S3EncryptionKey.Arn
+      DeletionPolicy: Delete
+      UpdateReplacePolicy: Retain
+
+    ForceSecureTransportBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref S3Bucket
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Action:
+                - 's3:GetObject'
+              Effect: Deny
+              Resource: !Join
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref S3Bucket
+                  - /*
+              Principal: '*'
+              Condition:
+                Bool:
+                  'aws:SecureTransport': 'false'
+
+    # --------------------------------------
+    # ----------KMS Configuration-----------
+    # --------------------------------------
+
+    S3EncryptionKey:
+      Type: AWS::KMS::Key
+      Properties:
+        Description: 'Encryption key used as default for S3 buckets'
+        Enabled: true
+        KeySpec: 'SYMMETRIC_DEFAULT'
+        KeyUsage: 'ENCRYPT_DECRYPT'
+
