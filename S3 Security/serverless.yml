@@ -20,12 +20,34 @@ resources:
             - ObjectOwnership: ObjectWriter
         VersioningConfiguration:
           Status: Enabled
+        CorsConfiguration:
+          CorsRules:
+              - AllowedHeaders:
+                - '*'
+                AllowedMethods:
+                  - GET
+                AllowedOrigins:
+                  - '*'
+                ExposedHeaders:
+                  - Date
+                Id: allowSharing
+                MaxAge: 3600
         BucketEncryption:
           ServerSideEncryptionConfiguration:
             - BucketKeyEnabled: true
               ServerSideEncryptionByDefault:
                 SSEAlgorithm: 'aws:kms'
                 KMSMasterKeyID: !GetAtt S3EncryptionKey.Arn
+        LoggingConfiguration:
+          DestinationBucketName: !Ref S3LogsBucket
+          LogFilePrefix: 'logs/'
+      DeletionPolicy: Delete
+      UpdateReplacePolicy: Retain
+
+    S3LogsBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: 's3-logs-bucket-a'
       DeletionPolicy: Delete
       UpdateReplacePolicy: Retain
 
@@ -36,6 +58,7 @@ resources:
         PolicyDocument:
           Version: '2012-10-17'
           Statement:
+            # Rechaza cualquier intento de obtener un archivo por medio de HTTP en vez de HTTPS
             - Action:
                 - 's3:GetObject'
               Effect: Deny
@@ -48,6 +71,38 @@ resources:
               Condition:
                 Bool:
                   'aws:SecureTransport': 'false'
+            # Rechaza cualquier intento de cargar archivos que no estén encriptados con KMS
+            - Action:
+                - 's3:PutObject'
+              Effect: Deny
+              Resource: !Join
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref S3Bucket
+                  - /*
+              Principal: '*'
+              Condition:
+                StringNotEquals:
+                  's3:x-amz-server-side-encryption': 'aws:kms'
+
+    AllowPutLogsBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref S3LogsBucket
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            # Permite agregar archivos de logs al bucket S3LogsBucket
+            - Action:
+                - 's3:PutObject'
+              Effect: Allow
+              Principal:
+                Service: logging.s3.amazonaws.com
+              Resource: !Join
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref S3LogsBucket
+                  - /*
 
     # --------------------------------------
     # ----------KMS Configuration-----------
