@@ -1,0 +1,96 @@
+service: s3-access-point
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+
+resources:
+  Resources:
+
+    # --------------------------------------
+    # ----------VCP Configuration-----------
+    # --------------------------------------
+    EC2VCP:
+      Type: AWS::EC2::VPC
+      Properties:
+        CidrBlock: 172.31.0.0/16
+        EnableDnsSupport: true
+        EnableDnsHostnames: true
+        InstanceTenancy: default
+
+    RouteTable:
+      Type: AWS::EC2::RouteTable
+      Properties:
+        VpcId: !Ref EC2VCP
+
+    PrivateSubnet:
+      Type: AWS::EC2::Subnet
+      Properties:
+        VpcId: !Ref EC2VCP
+        CidrBlock: 172.31.0.0/20
+        MapPublicIpOnLaunch: true
+
+    RouteTableAssociation:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        RouteTableId: !Ref RouteTable
+        SubnetId: !Ref PrivateSubnet
+
+    S3InterfaceEndpoint:
+      Type: AWS::EC2::VPCEndpoint
+      Properties:
+        VpcId: !Ref EC2VCP
+        VpcEndpointType: Interface
+        ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+        SubnetIds:
+          - !Ref PrivateSubnet
+        SecurityGroupIds:
+          - !Ref AllowSHHSecurityGroup
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal: '*'
+              Action:
+                - 's3:GetObject'
+              Resource:
+                - !Sub 'arn:aws:s3:::${S3Bucket}/*'
+
+    AllowSHHSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: SG for SSH access
+        VpcId: !Ref EC2VCP
+        SecurityGroupIngress:
+          - CidrIp: 0.0.0.0/0
+            FromPort: 22
+            ToPort: 22
+            IpProtocol: tcp
+
+    # --------------------------------------
+    # ----------EC2 Configuration-----------
+    # --------------------------------------
+
+    EC2Instance:
+      Type: AWS::EC2::Instance
+      Properties:
+        ImageId: ami-00c6177f250e07ec1
+        InstanceType: t2.micro
+        UserData: !Base64 ${file(ec2-user-data.sh)}
+        SubnetId: !Ref PrivateSubnet
+        SecurityGroupIds:
+          - !Ref AllowSHHSecurityGroup
+        Tags:
+          - Key: Name
+            Value: EC2 Instance
+
+    # --------------------------------------
+    # -----------S3 Configuration-----------
+    # --------------------------------------
+
+    S3Bucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: 's3-access-point-bucket-a'
+      DeletionPolicy: Delete
+      UpdateReplacePolicy: Retain
