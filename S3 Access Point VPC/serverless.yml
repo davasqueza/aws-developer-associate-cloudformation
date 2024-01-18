@@ -77,6 +77,8 @@ resources:
         ImageId: ami-00c6177f250e07ec1
         InstanceType: t2.micro
         UserData: !Base64 ${file(ec2-user-data.sh)}
+        KeyName: "EC2 Tutorial"
+        IamInstanceProfile: !Ref InstanceProfile
         SubnetId: !Ref PrivateSubnet
         SecurityGroupIds:
           - !Ref AllowSHHSecurityGroup
@@ -84,6 +86,43 @@ resources:
           - Key: Name
             Value: EC2 Instance
 
+    InstanceProfile:
+      Type: AWS::IAM::InstanceProfile
+      Properties:
+        InstanceProfileName: ec2-instance-profile
+        Roles:
+          - !Ref EC2InstanceRole
+
+    EC2InstanceRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: basic-instance-role
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - ec2.amazonaws.com
+              Action:
+                - sts:AssumeRole
+        Policies:
+          - PolicyName: EC2ReadOnlyPolicy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - ec2:Describe*
+                    - ec2:Get*
+                  Resource: '*'
+
+    EC2InstanceConnectEndpoint:
+      Type: AWS::EC2::InstanceConnectEndpoint
+      Properties:
+        ClientToken: 'EC2-S3-ACCESS-POINT'
+        PreserveClientIp: true
+        SubnetId: !Ref PrivateSubnet
     # --------------------------------------
     # -----------S3 Configuration-----------
     # --------------------------------------
