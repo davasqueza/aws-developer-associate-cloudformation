@@ -10,7 +10,7 @@ resources:
     # --------------------------------------
     # ----------VCP Configuration-----------
     # --------------------------------------
-    EC2VCP:
+    EC2VPC:
       Type: AWS::EC2::VPC
       Properties:
         CidrBlock: 172.31.0.0/16
@@ -21,12 +21,12 @@ resources:
     RouteTable:
       Type: AWS::EC2::RouteTable
       Properties:
-        VpcId: !Ref EC2VCP
+        VpcId: !Ref EC2VPC
 
     PrivateSubnet:
       Type: AWS::EC2::Subnet
       Properties:
-        VpcId: !Ref EC2VCP
+        VpcId: !Ref EC2VPC
         CidrBlock: 172.31.0.0/20
         MapPublicIpOnLaunch: true
 
@@ -39,7 +39,7 @@ resources:
     S3GatewayEndpoint:
       Type: AWS::EC2::VPCEndpoint
       Properties:
-        VpcId: !Ref EC2VCP
+        VpcId: !Ref EC2VPC
         VpcEndpointType: Gateway
         ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
         RouteTableIds:
@@ -50,18 +50,23 @@ resources:
             - Effect: Allow
               Principal: '*'
               Action:
-                - 's3:GetObject'
-                - 's3:PutObject'
+                - 's3:*'
+              Resource:
+                - !Sub 'arn:aws:s3:::${S3Bucket}/*'
+                - !Join  [ '', [ !GetAtt S3AccessPoint.Arn, '/object/*' ] ]
+            - Effect: Allow
+              Principal: '*'
+              Action:
                 - 's3:ListBucket'
               Resource:
                 - !Sub 'arn:aws:s3:::${S3Bucket}'
-                - !Sub 'arn:aws:s3:::${S3Bucket}/*'
+                - !GetAtt S3AccessPoint.Arn
 
     AllowSHHSecurityGroup:
       Type: AWS::EC2::SecurityGroup
       Properties:
         GroupDescription: SG for SSH access
-        VpcId: !Ref EC2VCP
+        VpcId: !Ref EC2VPC
         SecurityGroupIngress:
           - CidrIp: 0.0.0.0/0
             FromPort: 22
@@ -72,7 +77,7 @@ resources:
       Type: AWS::EC2::SecurityGroup
       Properties:
         GroupDescription: SG for HTTPS access
-        VpcId: !Ref EC2VCP
+        VpcId: !Ref EC2VPC
         SecurityGroupIngress:
           - CidrIp: 0.0.0.0/0
             FromPort: 443
@@ -142,6 +147,49 @@ resources:
     S3Bucket:
       Type: AWS::S3::Bucket
       Properties:
-        BucketName: 's3-access-point-bucket-a'
+        BucketName: 's3-access-point-bucket-b'
       DeletionPolicy: Delete
       UpdateReplacePolicy: Retain
+
+    MainS3BucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref S3Bucket
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Action: '*'
+              Effect: Allow
+              Resource:
+                - !Sub 'arn:aws:s3:::${S3Bucket}/*'
+                - !Sub 'arn:aws:s3:::${S3Bucket}'
+              Principal:
+                AWS: '*'
+              Condition:
+                StringEquals:
+                  's3:DataAccessPointAccount': !Sub '${AWS::AccountId}'
+
+    S3AccessPoint:
+      Type: AWS::S3::AccessPoint
+      Properties:
+        Bucket: !Ref S3Bucket
+        Name: main-access-point
+        VpcConfiguration:
+          VpcId:
+            Ref: EC2VPC
+        Policy:
+          Version: '2012-10-17'
+          Statement:
+            - Action:
+                - 's3:GetObject'
+                - 's3:PutObject'
+              Effect: Allow
+              Resource:
+                - !Sub 'arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/main-access-point/object/main/*'
+              Principal: '*'
+            - Action:
+                - 's3:ListBucket'
+              Effect: Allow
+              Resource:
+                - !Sub 'arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/main-access-point'
+              Principal: '*'
