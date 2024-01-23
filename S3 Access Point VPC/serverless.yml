@@ -54,8 +54,10 @@ resources:
               Resource:
                 - !Sub 'arn:aws:s3:::${S3Bucket}/*'
                 - !Sub 'arn:aws:s3:::${S3Bucket}'
-                - !GetAtt S3AccessPoint.Arn
-                - !Join  [ '', [ !GetAtt S3AccessPoint.Arn, '/object/*' ] ]
+                - !GetAtt FinanceAccessPoint.Arn
+                - !Join  [ '', [ !GetAtt FinanceAccessPoint.Arn, '/object/*' ] ]
+                - !GetAtt AnalyticsAccessPoint.Arn
+                - !Join  [ '', [ !GetAtt AnalyticsAccessPoint.Arn, '/object/*' ] ]
 
     AllowSHHSecurityGroup:
       Type: AWS::EC2::SecurityGroup
@@ -126,6 +128,7 @@ resources:
         ClientToken: 'EC2-S3-ACCESS-POINT'
         PreserveClientIp: true
         SubnetId: !Ref PrivateSubnet
+
     # --------------------------------------
     # -----------S3 Configuration-----------
     # --------------------------------------
@@ -155,13 +158,15 @@ resources:
                 AWS: '*'
               Condition:
                 StringEquals:
-                  's3:DataAccessPointArn': !GetAtt S3AccessPoint.Arn
+                  's3:DataAccessPointArn':
+                    - !GetAtt FinanceAccessPoint.Arn
+                    - !GetAtt AnalyticsAccessPoint.Arn
 
-    S3AccessPoint:
+    FinanceAccessPoint:
       Type: AWS::S3::AccessPoint
       Properties:
         Bucket: !Ref S3Bucket
-        Name: main-access-point
+        Name: finance-access-point
         VpcConfiguration:
           VpcId:
             Ref: EC2VPC
@@ -172,8 +177,29 @@ resources:
                 - 's3:GetObject'
                 - 's3:PutObject'
                 - 's3:ListBucket'
+                - 's3:DeleteObject'
               Effect: Allow
               Resource:
-                - !Sub 'arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/main-access-point/object/main/*'
-                - !Sub 'arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/main-access-point'
+                - !Sub 'arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/finance-access-point/object/finance/*'
+                - !Sub 'arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/finance-access-point'
+              Principal: '*'
+
+    AnalyticsAccessPoint:
+      Type: AWS::S3::AccessPoint
+      Properties:
+        Bucket: !Ref S3Bucket
+        Name: analytics-access-point
+        VpcConfiguration:
+          VpcId:
+            Ref: EC2VPC
+        Policy:
+          Version: '2012-10-17'
+          Statement:
+            - Action:
+                - 's3:GetObject'
+                - 's3:ListBucket'
+              Effect: Allow
+              Resource:
+                - !Sub 'arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/analytics-access-point/object/finance/*'
+                - !Sub 'arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/analytics-access-point'
               Principal: '*'
