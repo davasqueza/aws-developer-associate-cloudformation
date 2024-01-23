@@ -53,14 +53,9 @@ resources:
                 - 's3:*'
               Resource:
                 - !Sub 'arn:aws:s3:::${S3Bucket}/*'
-                - !Join  [ '', [ !GetAtt S3AccessPoint.Arn, '/object/*' ] ]
-            - Effect: Allow
-              Principal: '*'
-              Action:
-                - 's3:ListBucket'
-              Resource:
                 - !Sub 'arn:aws:s3:::${S3Bucket}'
                 - !GetAtt S3AccessPoint.Arn
+                - !Join  [ '', [ !GetAtt S3AccessPoint.Arn, '/object/*' ] ]
 
     AllowSHHSecurityGroup:
       Type: AWS::EC2::SecurityGroup
@@ -124,15 +119,6 @@ resources:
                   - ec2.amazonaws.com
               Action:
                 - sts:AssumeRole
-        Policies:
-          - PolicyName: EC2InstancePolicy
-            PolicyDocument:
-              Version: '2012-10-17'
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - 's3:*'
-                  Resource: '*'
 
     EC2InstanceConnectEndpoint:
       Type: AWS::EC2::InstanceConnectEndpoint
@@ -158,7 +144,9 @@ resources:
         PolicyDocument:
           Version: '2012-10-17'
           Statement:
-            - Action: '*'
+            - Sid: DelegateControlToAccessPoint
+              Action:
+                - 's3:*'
               Effect: Allow
               Resource:
                 - !Sub 'arn:aws:s3:::${S3Bucket}/*'
@@ -167,7 +155,7 @@ resources:
                 AWS: '*'
               Condition:
                 StringEquals:
-                  's3:DataAccessPointAccount': !Sub '${AWS::AccountId}'
+                  's3:DataAccessPointArn': !GetAtt S3AccessPoint.Arn
 
     S3AccessPoint:
       Type: AWS::S3::AccessPoint
@@ -183,13 +171,9 @@ resources:
             - Action:
                 - 's3:GetObject'
                 - 's3:PutObject'
-              Effect: Allow
-              Resource:
-                - !Sub 'arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/main-access-point/object/main/*'
-              Principal: '*'
-            - Action:
                 - 's3:ListBucket'
               Effect: Allow
               Resource:
+                - !Sub 'arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/main-access-point/object/main/*'
                 - !Sub 'arn:${AWS::Partition}:s3:${AWS::Region}:${AWS::AccountId}:accesspoint/main-access-point'
               Principal: '*'
