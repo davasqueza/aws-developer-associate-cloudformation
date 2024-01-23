@@ -8,6 +8,8 @@ Content-Transfer-Encoding: 7bit
 Content-Disposition: attachment; filename="cloud-config.txt"
 
 #cloud-config
+
+#Allows to always run user script after each reboot: https://docs.aws.amazon.com/es_es/AWSEC2/latest/UserGuide/amazon-linux-ami-basics.html#amazon-linux-cloud-init
 cloud_final_modules:
 - [scripts-user, always]
 
