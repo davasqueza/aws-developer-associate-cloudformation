@@ -1,4 +1,4 @@
-service: s3-access-point
+service: s3-access-point-v2
 
 provider:
   name: aws
@@ -59,6 +59,18 @@ resources:
                 - !GetAtt AnalyticsAccessPoint.Arn
                 - !Join  [ '', [ !GetAtt AnalyticsAccessPoint.Arn, '/object/*' ] ]
 
+    EC2InterfaceEndpoint:
+      Type: AWS::EC2::VPCEndpoint
+      Properties:
+        VpcId: !Ref EC2VPC
+        VpcEndpointType: Interface
+        ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ec2'
+        PrivateDnsEnabled: true
+        SubnetIds:
+          - !Ref PrivateSubnet
+        SecurityGroupIds:
+          - !Ref AllowHTTPSSecurityGroup
+
     AllowSHHSecurityGroup:
       Type: AWS::EC2::SecurityGroup
       Properties:
@@ -100,6 +112,10 @@ resources:
         Tags:
           - Key: Name
             Value: EC2 Instance
+          - Key: FINANCEAP
+            Value: !GetAtt FinanceAccessPoint.Alias
+          - Key: ANALYTICSAP
+            Value: !GetAtt AnalyticsAccessPoint.Alias
 
     InstanceProfile:
       Type: AWS::IAM::InstanceProfile
@@ -121,6 +137,21 @@ resources:
                   - ec2.amazonaws.com
               Action:
                 - sts:AssumeRole
+
+    ReadonlyEC2DescribePolicy:
+      Type: AWS::IAM::Policy
+      Properties:
+        PolicyName: ReadonlyTagsPolicy
+        Roles:
+          - !Ref EC2InstanceRole
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - ec2:Describe*
+              Resource:
+                - '*'
 
     EC2InstanceConnectEndpoint:
       Type: AWS::EC2::InstanceConnectEndpoint
