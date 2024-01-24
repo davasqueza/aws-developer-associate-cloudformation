@@ -1,0 +1,89 @@
+service: cloudfront-introduction
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+
+resources:
+  Resources:
+  # --------------------------------------
+  # -----------S3 Configuration-----------
+  # --------------------------------------
+    S3Bucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: 'cloudfront-introduction-bucket-a'
+      DeletionPolicy: Delete
+      UpdateReplacePolicy: Retain
+
+    S3BucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref S3Bucket
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Sid: AllowCloudFrontAccess
+              Action:
+                - 's3:GetObject'
+              Effect: Allow
+              Resource:
+                - !Sub 'arn:aws:s3:::${S3Bucket}/*'
+              Principal:
+                Service: 'cloudfront.amazonaws.com'
+              Condition:
+                StringEquals:
+                  'AWS:SourceArn': !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}"
+
+    # --------------------------------------
+    # -------CloudFront Configuration-------
+    # --------------------------------------
+
+    CloudFrontDistribution:
+      Type: AWS::CloudFront::Distribution
+      Properties:
+        DistributionConfig:
+          DefaultRootObject: 'index.html'
+          Enabled: true
+          DefaultCacheBehavior:
+            TargetOriginId: myS3Origin
+            ViewerProtocolPolicy: 'redirect-to-https'
+            CachePolicyId: !Ref DefaultCachePolicy
+            AllowedMethods:
+              - GET
+              - HEAD
+            Compress: true
+          Origins:
+            - Id: myS3Origin
+              DomainName: !GetAtt S3Bucket.DomainName
+              OriginAccessControlId: !Ref S3OriginAccessControl
+              S3OriginConfig:
+                OriginAccessIdentity: ''
+
+    DefaultCachePolicy:
+      Type: AWS::CloudFront::CachePolicy
+      Properties:
+        CachePolicyConfig:
+          Name: CachingOptimized
+          Comment: 'Policy with caching enabled. Same to the managed CachingOptimized'
+          DefaultTTL: 86400
+          MaxTTL: 31536000
+          MinTTL: 1
+          ParametersInCacheKeyAndForwardedToOrigin:
+            EnableAcceptEncodingBrotli: true
+            EnableAcceptEncodingGzip: true
+            CookiesConfig:
+              CookieBehavior: none
+            HeadersConfig:
+              HeaderBehavior: none
+            QueryStringsConfig:
+              QueryStringBehavior: none
+
+    S3OriginAccessControl:
+      Type: AWS::CloudFront::OriginAccessControl
+      Properties:
+        OriginAccessControlConfig:
+          Name: 's3-origin-access-control'
+          OriginAccessControlOriginType: s3
+          SigningBehavior: 'always'
+          SigningProtocol: 'sigv4'
