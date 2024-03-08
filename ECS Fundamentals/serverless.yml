@@ -299,3 +299,59 @@ resources:
         LoadBalancerArn: !Ref VPCLoadBalancer
         Port: 80
         Protocol: HTTP
+
+    # ---------------------------------------
+    # ----------ECS task definition----------
+    # ---------------------------------------
+
+    NginxTaskDefinition:
+      Type: AWS::ECS::TaskDefinition
+      Properties:
+        Family: 'nginxdemos-hello'
+        ContainerDefinitions:
+          - Name: 'nginxdemos-hello'
+            Image: 'nginxdemos/hello'
+            PortMappings:
+              - AppProtocol: http
+                ContainerPort: 80
+                HostPort: 80
+        RequiresCompatibilities:
+          - EC2
+          - FARGATE
+        RuntimePlatform:
+          CpuArchitecture: X86_64
+          OperatingSystemFamily: LINUX
+        Cpu: '512'
+        Memory: '1024'
+        # TaskRoleArn:
+        ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+        NetworkMode: awsvpc
+
+    ECSTaskExecutionRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: 'ecs-tasks.amazonaws.com'
+              Action:
+                - 'sts:AssumeRole'
+              Condition:
+                ArnLike:
+                  aws:SourceArn: !Sub arn:aws:ecs:${AWS::Region}:${AWS::AccountId}:*
+                StringEquals:
+                  aws:SourceAccount: !Ref AWS::AccountId
+        Path: /
+        ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+
+    NginxTaskSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: SG for Nginx task
+        VpcId: !Ref ELBVPC
+        SecurityGroupIngress:
+          - SourceSecurityGroupId: !GetAtt LoadBalancerSecurityGroup.GroupId
+            IpProtocol: '-1'
+            Description: Allow traffic from ALB
