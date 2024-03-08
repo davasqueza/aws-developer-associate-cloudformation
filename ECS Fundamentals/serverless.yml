@@ -125,7 +125,7 @@ resources:
       Type: AWS::AutoScaling::LaunchConfiguration
       Properties:
         ImageId: ${ssm:/aws/service/ecs/optimized-ami/amazon-linux-2/recommended/image_id}
-        InstanceType: t2.micro
+        InstanceType: t2.small
         IamInstanceProfile: !Ref EC2InstanceProfile
         SecurityGroups:
           - !Ref InstanceSecurityGroup
@@ -281,7 +281,7 @@ resources:
       Type: AWS::ElasticLoadBalancingV2::TargetGroup
       Properties:
         Name: MyTargets
-        TargetType: instance
+        TargetType: ip
         VpcId: !Ref ELBVPC
         Port: 80
         Protocol: HTTP
@@ -355,3 +355,29 @@ resources:
           - SourceSecurityGroupId: !GetAtt LoadBalancerSecurityGroup.GroupId
             IpProtocol: '-1'
             Description: Allow traffic from ALB
+
+    # ---------------------------------------
+    # ----------ECS service deploy-----------
+    # ---------------------------------------
+
+    NginxService:
+      Type: AWS::ECS::Service
+      DependsOn: LoadBalancerListener
+      Properties:
+        ServiceName: nginxdemos
+        Cluster: !Ref DemoCluster
+        LaunchType: EC2
+        TaskDefinition: !Ref NginxTaskDefinition
+        DesiredCount: 1
+        LoadBalancers:
+          - ContainerName: 'nginxdemos-hello'
+            ContainerPort: 80
+            TargetGroupArn: !Ref TargetGroup
+        NetworkConfiguration:
+          AwsvpcConfiguration:
+            AssignPublicIp: ENABLED
+            SecurityGroups:
+              - !Ref NginxTaskSecurityGroup
+            Subnets:
+              - !Ref PublicSubnet1
+              - !Ref PublicSubnet2
