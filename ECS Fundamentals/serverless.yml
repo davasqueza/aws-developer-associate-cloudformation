@@ -249,3 +249,53 @@ resources:
             PredefinedMetricType: 'ASGAverageCPUUtilization'
           TargetValue: 40
         EstimatedInstanceWarmup: 300
+
+    # ---------------------------------------
+    # -----------ELB Configuration-----------
+    # ---------------------------------------
+
+    LoadBalancerSecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: Load Balancer SG for HTTP access
+        VpcId: !Ref ELBVPC
+        SecurityGroupIngress:
+          - CidrIp: 0.0.0.0/0
+            FromPort: 80
+            ToPort: 80
+            IpProtocol: tcp
+
+    VPCLoadBalancer:
+      Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+      Properties:
+        Name: MyFirstALB
+        Type: application
+        Scheme: "internet-facing"
+        SecurityGroups:
+          - !Ref LoadBalancerSecurityGroup
+        Subnets:
+          - !Ref PublicSubnet1
+          - !Ref PublicSubnet2
+
+    TargetGroup:
+      Type: AWS::ElasticLoadBalancingV2::TargetGroup
+      Properties:
+        Name: MyTargets
+        TargetType: instance
+        VpcId: !Ref ELBVPC
+        Port: 80
+        Protocol: HTTP
+        ProtocolVersion: HTTP1
+        HealthCheckEnabled: true
+        HealthCheckProtocol: HTTP
+        HealthCheckPath: "/"
+
+    LoadBalancerListener:
+      Type: AWS::ElasticLoadBalancingV2::Listener
+      Properties:
+        DefaultActions:
+          - TargetGroupArn: !GetAtt TargetGroup.TargetGroupArn
+            Type: forward
+        LoadBalancerArn: !Ref VPCLoadBalancer
+        Port: 80
+        Protocol: HTTP
