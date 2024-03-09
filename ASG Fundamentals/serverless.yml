@@ -142,6 +142,7 @@ resources:
 
     AutoScalingGroup:
       Type: AWS::AutoScaling::AutoScalingGroup
+      DependsOn: InternetGatewayAttachment
       Properties:
         MinSize: '2'
         MaxSize: '5'
