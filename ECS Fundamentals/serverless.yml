@@ -125,7 +125,7 @@ resources:
       Type: AWS::AutoScaling::LaunchConfiguration
       Properties:
         ImageId: ${ssm:/aws/service/ecs/optimized-ami/amazon-linux-2/recommended/image_id}
-        InstanceType: t2.small
+        InstanceType: c4.large
         IamInstanceProfile: !Ref EC2InstanceProfile
         SecurityGroups:
           - !Ref InstanceSecurityGroup
@@ -227,12 +227,12 @@ resources:
 
     ECSAutoScalingGroup:
       Type: AWS::AutoScaling::AutoScalingGroup
-      DependsOn: DemoCluster
+      DependsOn: AttachGateway
       Properties:
         LaunchConfigurationName: !Ref ECSLaunchConfiguration
         MaxSize: '3'
         MinSize: '0'
-        DesiredCapacity: '0'
+        DesiredCapacity: '1'
         HealthCheckType: 'ELB'
         HealthCheckGracePeriod: 30
         VPCZoneIdentifier:
@@ -267,6 +267,7 @@ resources:
 
     VPCLoadBalancer:
       Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+      DependsOn: AttachGateway
       Properties:
         Name: MyFirstALB
         Type: application
@@ -362,7 +363,9 @@ resources:
 
     NginxService:
       Type: AWS::ECS::Service
-      DependsOn: LoadBalancerListener
+      DependsOn:
+        - ECSAutoScalingGroup
+        - LoadBalancerListener
       Properties:
         ServiceName: nginxdemos
         Cluster: !Ref DemoCluster
@@ -375,7 +378,6 @@ resources:
             TargetGroupArn: !Ref TargetGroup
         NetworkConfiguration:
           AwsvpcConfiguration:
-            AssignPublicIp: ENABLED
             SecurityGroups:
               - !Ref NginxTaskSecurityGroup
             Subnets:

@@ -190,6 +190,7 @@ resources:
 
     ALB:
       Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+      DependsOn: InternetGatewayAttachment
       Properties:
         Type: application
         Scheme: internet-facing
