@@ -1,0 +1,170 @@
+service: elastic-beanstalk-fundamentals
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+
+resources:
+  Resources:
+
+    # ---------------------------------------
+    # -----------VPC Configuration-----------
+    # ---------------------------------------
+
+    #Note: VPC configuration is only required if the AWS account does not have a default VPC
+    BeanStalkVPC:
+      Type: AWS::EC2::VPC
+      Properties:
+        CidrBlock: 10.0.0.0/16
+        EnableDnsSupport: true
+        EnableDnsHostnames: true
+        Tags:
+          - Key: Name
+            Value: VPC for Elastic BeanStalk application
+
+    VPCInternetGateway:
+      Type: AWS::EC2::InternetGateway
+      Properties:
+        Tags:
+          - Key: Name
+            Value: Internet Gateway BeanStalkVPC
+
+    AttachGateway:
+      Type: AWS::EC2::VPCGatewayAttachment
+      Properties:
+        VpcId: !Ref BeanStalkVPC
+        InternetGatewayId: !Ref VPCInternetGateway
+
+    RouteTable:
+      Type: AWS::EC2::RouteTable
+      Properties:
+        VpcId: !Ref BeanStalkVPC
+        Tags:
+          - Key: Name
+            Value: BeanStalkVPC Route Table
+
+    DefaultIpv4Route:
+      Type: AWS::EC2::Route
+      Properties:
+        RouteTableId: !Ref RouteTable
+        DestinationCidrBlock: 0.0.0.0/0
+        GatewayId: !Ref VPCInternetGateway
+
+    PublicSubnet1:
+      Type: AWS::EC2::Subnet
+      Properties:
+        VpcId: !Ref BeanStalkVPC
+        CidrBlock: 10.0.1.0/24
+        MapPublicIpOnLaunch: true
+        AvailabilityZone: !Select
+          - 0
+          - Fn::GetAZs: !Ref 'AWS::Region'
+        Tags:
+          - Key: Name
+            Value: Public Subnet 1
+
+    PublicSubnet2:
+      Type: AWS::EC2::Subnet
+      Properties:
+        VpcId: !Ref BeanStalkVPC
+        CidrBlock: 10.0.2.0/24
+        MapPublicIpOnLaunch: true
+        AvailabilityZone: !Select
+          - 1
+          - Fn::GetAZs: !Ref 'AWS::Region'
+        Tags:
+          - Key: Name
+            Value: Public Subnet 2
+
+    RouteTableAssociation1:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        RouteTableId: !Ref RouteTable
+        SubnetId: !Ref PublicSubnet1
+
+    RouteTableAssociation2:
+      Type: AWS::EC2::SubnetRouteTableAssociation
+      Properties:
+        RouteTableId: !Ref RouteTable
+        SubnetId: !Ref PublicSubnet2
+
+    # ---------------------------------------
+    # ----Elastic BeanStalk Configuration----
+    # ---------------------------------------
+
+    MyApplication:
+      Type: AWS::ElasticBeanstalk::Application
+      Properties:
+        Description: AWS Elastic Beanstalk Sample Application
+
+    MyApplicationVersion:
+      Type: AWS::ElasticBeanstalk::ApplicationVersion
+      Properties:
+        ApplicationName:
+          Ref: MyApplication
+        Description: AWS ElasticBeanstalk Sample Application Version
+        SourceBundle:
+          S3Bucket: !Sub 'elasticbeanstalk-samples-${AWS::Region}'
+          S3Key: nodejs-sample.zip
+
+    ConfigurationTemplate:
+      Type: AWS::ElasticBeanstalk::ConfigurationTemplate
+      Properties:
+        ApplicationName:
+          Ref: MyApplication
+        Description: AWS ElasticBeanstalk Sample Configuration Template
+        OptionSettings: # https://docs.aws.amazon.com/elasticbeanstalk/latest/dg/command-options-general.html#command-options-general-ec2vpc
+          - Namespace: aws:autoscaling:asg
+            OptionName: MinSize
+            Value: '2'
+          - Namespace: aws:autoscaling:asg
+            OptionName: MaxSize
+            Value: '6'
+          - Namespace: aws:elasticbeanstalk:environment
+            OptionName: EnvironmentType
+            Value: LoadBalanced
+          - Namespace: aws:autoscaling:launchconfiguration
+            OptionName: IamInstanceProfile
+            Value: !Ref MyInstanceProfile
+          - Namespace: aws:ec2:vpc
+            OptionName: VPCId
+            Value: !Ref BeanStalkVPC
+          - Namespace: aws:ec2:vpc
+            OptionName: Subnets
+            Value: !Join [',', [!Ref PublicSubnet2, !Ref PublicSubnet1]]
+        SolutionStackName: '64bit Amazon Linux 2023 v6.1.2 running Node.js 20'
+
+    DevEnvironment:
+      Type: AWS::ElasticBeanstalk::Environment
+      Properties:
+        ApplicationName:
+          Ref: MyApplication
+        Description: AWS ElasticBeanstalk Development Environment
+        TemplateName:
+          Ref: ConfigurationTemplate
+        VersionLabel:
+          Ref: MyApplicationVersion
+
+    MyInstanceRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - ec2.amazonaws.com
+              Action:
+                - sts:AssumeRole
+        Description: Beanstalk EC2 role
+        ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/AWSElasticBeanstalkWebTier
+          - arn:aws:iam::aws:policy/AWSElasticBeanstalkMulticontainerDocker
+          - arn:aws:iam::aws:policy/AWSElasticBeanstalkWorkerTier
+
+    MyInstanceProfile:
+      Type: AWS::IAM::InstanceProfile
+      Properties:
+        Roles:
+          - !Ref MyInstanceRole
