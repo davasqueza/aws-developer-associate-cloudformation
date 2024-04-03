@@ -11,3 +11,5 @@ gen
 /**/.serverless
 /**/**.pem
 
+# Node modules files
+/**/node_modules
