@@ -96,6 +96,13 @@ resources:
       Type: AWS::ElasticBeanstalk::Application
       Properties:
         Description: AWS Elastic Beanstalk Sample Application
+        ResourceLifecycleConfig:
+          ServiceRole: !Ref BeanStalkServiceRole
+          VersionLifecycleConfig:
+            MaxAgeRule:
+              DeleteSourceFromS3: false
+              Enabled: true
+              MaxAgeInDays: 180
 
     MyApplicationVersion:
       Type: AWS::ElasticBeanstalk::ApplicationVersion
@@ -125,7 +132,7 @@ resources:
             Value: LoadBalanced
           - Namespace: aws:autoscaling:launchconfiguration
             OptionName: IamInstanceProfile
-            Value: !Ref MyInstanceProfile
+            Value: !Ref BeanStalkEC2InstanceProfile
           - Namespace: aws:ec2:vpc
             OptionName: VPCId
             Value: !Ref BeanStalkVPC
@@ -145,7 +152,7 @@ resources:
         VersionLabel:
           Ref: MyApplicationVersion
 
-    MyInstanceRole:
+    BeanStalkServiceRole:
       Type: AWS::IAM::Role
       Properties:
         AssumeRolePolicyDocument:
@@ -163,8 +170,8 @@ resources:
           - arn:aws:iam::aws:policy/AWSElasticBeanstalkMulticontainerDocker
           - arn:aws:iam::aws:policy/AWSElasticBeanstalkWorkerTier
 
-    MyInstanceProfile:
+    BeanStalkEC2InstanceProfile:
       Type: AWS::IAM::InstanceProfile
       Properties:
-        Roles:
-          - !Ref MyInstanceRole
+        Roles: # You can add more roles here if your application requires access to another AWS Services (Ex: DynamoDB)
+          - !Ref BeanStalkServiceRole
