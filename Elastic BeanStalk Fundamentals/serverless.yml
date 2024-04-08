@@ -97,7 +97,7 @@ resources:
       Properties:
         Description: AWS Elastic Beanstalk Sample Application
         ResourceLifecycleConfig:
-          ServiceRole: !Ref BeanStalkServiceRole
+          ServiceRole: !GetAtt BeanStalkServiceRole.Arn
           VersionLifecycleConfig:
             MaxAgeRule:
               DeleteSourceFromS3: false
