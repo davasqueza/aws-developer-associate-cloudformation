@@ -195,13 +195,17 @@ resources:
                 - ec2:Describe*
               Resource:
                 - "*"
+    EC2KeyPair:
+      Type: AWS::EC2::KeyPair
+      Properties:
+        KeyName: EC2KeyPair
 
     InstanceA:
       Type: AWS::EC2::Instance
       DependsOn: FileSystemResource
       Properties:
-        ImageId: ami-00c6177f250e07ec1
-        KeyName: "EC2 Tutorial"
+        ImageId: ami-051f8a213df8bc089
+        KeyName: !Ref EC2KeyPair
         InstanceType: t2.micro
         UserData: !Base64 ${file(ec2-user-data.sh)}
         IamInstanceProfile: !Ref InstanceProfile
@@ -219,8 +223,8 @@ resources:
       Type: AWS::EC2::Instance
       DependsOn: FileSystemResource
       Properties:
-        ImageId: ami-00c6177f250e07ec1
-        KeyName: "EC2 Tutorial"
+        ImageId: ami-051f8a213df8bc089
+        KeyName: !Ref EC2KeyPair
         InstanceType: t2.micro
         UserData: !Base64 ${file(ec2-user-data.sh)}
         IamInstanceProfile: !Ref InstanceProfile

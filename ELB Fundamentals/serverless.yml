@@ -102,11 +102,16 @@ resources:
             ToPort: 80
             IpProtocol: tcp
 
+    EC2KeyPair:
+      Type: AWS::EC2::KeyPair
+      Properties:
+        KeyName: EC2KeyPair
+
     InstanceA:
       Type: AWS::EC2::Instance
       Properties:
-        ImageId: ami-00c6177f250e07ec1
-        KeyName: "EC2 Tutorial"
+        ImageId: ami-051f8a213df8bc089
+        KeyName: !Ref EC2KeyPair
         InstanceType: t2.micro
         UserData: !Base64 ${file(ec2-user-data.sh)}
         SubnetId: !Ref PublicSubnet1
@@ -116,12 +121,11 @@ resources:
           - Key: Name
             Value: Instance A
 
-
     InstanceB:
       Type: AWS::EC2::Instance
       Properties:
-        ImageId: ami-00c6177f250e07ec1
-        KeyName: "EC2 Tutorial"
+        ImageId: ami-051f8a213df8bc089
+        KeyName: !Ref EC2KeyPair
         InstanceType: t2.micro
         UserData: !Base64 ${file(ec2-user-data.sh)}
         SubnetId: !Ref PublicSubnet2

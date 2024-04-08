@@ -127,7 +127,7 @@ resources:
       Properties:
         LaunchTemplateName: AutoScaling
         LaunchTemplateData:
-          ImageId: ami-04823729c75214919
+          ImageId: ami-051f8a213df8bc089
           InstanceType: t2.micro
           NetworkInterfaces:
             - DeviceIndex: 0

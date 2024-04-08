@@ -96,14 +96,18 @@ resources:
     # --------------------------------------
     # ----------EC2 Configuration-----------
     # --------------------------------------
+    EC2KeyPair:
+      Type: AWS::EC2::KeyPair
+      Properties:
+        KeyName: EC2KeyPair
 
     EC2Instance:
       Type: AWS::EC2::Instance
       Properties:
-        ImageId: ami-00c6177f250e07ec1
+        ImageId: ami-051f8a213df8bc089
+        KeyName: !Ref EC2KeyPair
         InstanceType: t2.micro
         UserData: !Base64 ${file(ec2-user-data.sh)}
-        KeyName: "EC2 Tutorial"
         IamInstanceProfile: !Ref InstanceProfile
         SubnetId: !Ref PrivateSubnet
         SecurityGroupIds:
