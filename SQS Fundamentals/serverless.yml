@@ -1,0 +1,32 @@
+service: sqs-fundamentals
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+
+resources:
+  Resources:
+    # ---------------------------------------
+    # -----------SQS Configuration-----------
+    # ---------------------------------------
+
+    MyFirstQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: DemoQueue
+        VisibilityTimeout: 5
+        MessageRetentionPeriod: 345600 # 4 days
+        DelaySeconds: 0
+        MaximumMessageSize: 262144 # 256 KiB
+        ReceiveMessageWaitTimeSeconds: 20 # Long polling
+        SqsManagedSseEnabled: true
+        RedrivePolicy:
+          deadLetterTargetArn: !GetAtt MyFirstDLQQueue.Arn
+          maxReceiveCount: 3
+
+    MyFirstDLQQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: DemoQueueDLQ
+        MessageRetentionPeriod: 1209600 # 14 days
+
